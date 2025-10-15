@@ -10,43 +10,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      # 3️⃣ Build & Push Docker Image
       - name: Build & Push Docker Image
         uses: docker/build-push-action@v4
         with:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/project0:latest
 
+      # 4️⃣ Login to Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-     - name: Deploy to Azure Container Instances
-  run: |
-    az container delete \
-      --resource-group project0-rg \
-      --name project0-instance \
-      --yes || echo "Container did not exist, creating new one"
-    
-    az container create \
-      --resource-group project0-rg \
-      --name project0-instance \
-      --image ${{ secrets.DOCKERHUB_USERNAME }}/project0:latest \
-      --dns-name-label project0-demo123 \
-      --ports 8080 \
-      --os-type Linux \
-      --cpu 1 \
-      --memory 1 \
-      --registry-login-server index.docker.io \
-      --registry-username ${{ secrets.DOCKERHUB_USERNAME }} \
-      --registry-password ${{ secrets.DOCKERHUB_PASSWORD }}
+      # 5️⃣ Deploy to Azure Container Instances
+      - name: Deploy to Azure Container Instances
+        run: |
+          echo "Deleting existing container (if exists)..."
+          az container delete \
+            --resource-group project0-rg \
+            --name project0-instance \
+            --yes || echo "No existing container found, creating new one"
 
+          echo "Creating container..."
+          az container create \
+            --resource-group project0-rg \
+            --name project0-instance \
+            --image ${{ secrets.DOCKERHUB_USERNAME }}/project0:latest \
+            --dns-name-label project0-demo123 \
+            --ports 8080 \
+            --os-type Linux \
+            --cpu 1 \
+            --memory 1 \
+            --registry-login-server index.docker.io \
+            --registry-username ${{ secrets.DOCKERHUB_USERNAME }} \
+            --registry-password ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      # 6️⃣ Show container info
+      - name: Show deployed container FQDN
+        run: |
+          az container show \
+            --resource-group project0-rg \
+            --name project0-instance \
+            --query ipAddress.fqdn -o tsv
